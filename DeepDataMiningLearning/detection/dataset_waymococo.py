@@ -168,7 +168,7 @@ def get_transformsimple(train):
 from pathlib import Path
 if __name__ == "__main__":
     # path to your own data and coco file
-    data_root = '/data/cmpe249-fa23/WaymoCOCO/'
+    data_root = '/data/cmpe258-sp24/WaymoCOCO/'
 
     #jsonfile = 'annotations_train684step8allobject.json' #4 classes, 0,1,2,4 85008
     jsonfile = 'annotations_valallnew.json' #4 classes, 0,1,2,4 199935
@@ -178,7 +178,7 @@ if __name__ == "__main__":
     # create own Dataset
     mywaymodataset = WaymoCOCODataset(root=data_root,  
                           annotation=ann_file,
-                          transforms=get_transformsimple(False)
+                          transform=get_transformsimple(False)
                           )
     length = len(mywaymodataset)
     print("Dataset",len(mywaymodataset))#85008

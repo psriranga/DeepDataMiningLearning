@@ -24,7 +24,7 @@ from torch.optim.lr_scheduler import StepLR
 from torch.utils.data import Subset
 
 #os.environ['CUDA_VISIBLE_DEVICES'] = "0" #"0,1"
-CHECKPOINT_PATH="/home/010796032/MyRepo/DeepDataMiningLearning/data"
+CHECKPOINT_PATH="/home/017103164/MyRepo/DeepDataMiningLearning/data"
 CHECKPOINT_file=os.path.join(CHECKPOINT_PATH, 'checkpoint.pth.tar')
 
 model_names = sorted(name for name in models.__dict__

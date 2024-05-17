@@ -254,7 +254,7 @@ def prepare_dataloader(dataset: Dataset, batch_size: int):
     )
 
 
-def main(rank: int, world_size: int, save_every: int, total_epochs: int, batch_size: int, snapshot_path: str = "/home/010796032/MyRepo/DeepDataMiningLearning/data/snapshot.pt"):
+def main(rank: int, world_size: int, save_every: int, total_epochs: int, batch_size: int, snapshot_path: str = "/home/017103164/MyRepo/DeepDataMiningLearning/data/snapshot.pt"):
     #rank is auto-allocated by DDP when calling mp.spawn.
     #world_size is the number of processes across the training job. 
     # For GPU training, this corresponds to the number of GPUs in use, and each process works on a dedicated GPU.

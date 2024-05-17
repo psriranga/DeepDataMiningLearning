@@ -1,12 +1,10 @@
 import torchvision
 import torch
-from typing import Dict, List, Optional, Tuple, Union
-from torchvision.models import get_model, get_model_weights, get_weight, list_models
+from torchvision.models import get_model, get_model_weights, list_models
 from torchvision.models.detection.faster_rcnn import FastRCNNPredictor
-from torchvision.models.detection import FasterRCNN
-from torchvision.models.detection.rpn import AnchorGenerator
 from DeepDataMiningLearning.detection.modules.yolomodels import create_yolomodel, freeze_yolomodel
 from DeepDataMiningLearning.detection.modeling_rpnfasterrcnn import CustomRCNN
+from DeepDataMiningLearning.detection.backbone import get_efficientnet_fasterrcnn
 import os
 
 try:
@@ -18,13 +16,13 @@ except:
     #     args.model, weights=args.weights, weights_backbone=args.weights_backbone, num_classes=num_classes, **kwargs
     # )
 def get_torchvision_detection_models(modelname, box_score_thresh=0.9):
-    weights_enum = get_model_weights(modelname) #<enum 'FasterRCNN_MobileNet_V3_Large_320_FPN_Weights'>
-    weights = weights_enum.DEFAULT #get the default weights
+    weights_enum = get_model_weights(modelname)
+    weights = weights_enum.DEFAULT
     preprocess = weights.transforms()
     classes = weights.meta["categories"]
-    pretrained_model=get_model(modelname, box_score_thresh=0.9, weights="DEFAULT")
+    pretrained_model = get_model(modelname, box_score_thresh=box_score_thresh, weights="DEFAULT")
     
-    return pretrained_model, preprocess, weights, classes
+    return pretrained_model, preprocess, classes
 
 def modify_fasterrcnnheader(model, num_classes, freeze=True):
     if freeze == True:
@@ -51,40 +49,7 @@ def load_trained_model(modelname, num_classes, checkpointpath):
 def modify_backbone(model, num_classes):
     # load a pre-trained model for classification and return
     # only the features
-    backbone = torchvision.models.mobilenet_v2(weights="DEFAULT").features
-    # FasterRCNN needs to know the number of
-    # output channels in a backbone. For mobilenet_v2, it's 1280
-    # so we need to add it here
-    backbone.out_channels = 1280
-
-    # let's make the RPN generate 5 x 3 anchors per spatial
-    # location, with 5 different sizes and 3 different aspect
-    # ratios. We have a Tuple[Tuple[int]] because each feature
-    # map could potentially have different sizes and
-    # aspect ratios
-    anchor_generator = AnchorGenerator(sizes=((32, 64, 128, 256, 512),),
-                                    aspect_ratios=((0.5, 1.0, 2.0),))
-
-    # let's define what are the feature maps that we will
-    # use to perform the region of interest cropping, as well as
-    # the size of the crop after rescaling.
-    # if your backbone returns a Tensor, featmap_names is expected to
-    # be [0]. More generally, the backbone should return an
-    # OrderedDict[Tensor], and in featmap_names you can choose which
-    # feature maps to use.
-    roi_pooler = torchvision.ops.MultiScaleRoIAlign(featmap_names=['0'],
-                                                    output_size=7,
-                                                    sampling_ratio=2)
-
-    # put the pieces together inside a FasterRCNN model
-    model = FasterRCNN(backbone,
-                    num_classes=2,
-                    rpn_anchor_generator=anchor_generator,
-                    box_roi_pool=roi_pooler)
-    return model
-    # model = torchvision.models.get_model(
-    #     args.model, weights=args.weights, weights_backbone=args.weights_backbone, num_classes=num_classes, **kwargs
-    # )
+    return get_efficientnet_fasterrcnn(num_classes)
 
 def create_testdata():
     images, boxes = torch.rand(4, 3, 600, 1200), torch.rand(4, 11, 4)
@@ -114,7 +79,7 @@ def test_defaultmodels():
     model, preprocess, weights, classes = get_torchvision_detection_models(modelname, box_score_thresh=0.2)
     INSTANCE_CATEGORY_NAMES = weights.meta["categories"]
     print(model.backbone.out_channels) #256
-    torch.save(model.state_dict(), "/data/cmpe249-fa23/modelzoo/fasterrcnn_resnet50_fpn_v2.pt")
+    torch.save(model.state_dict(), "/data/cmpr258-sp4/modelzoo/fasterrcnn_resnet50_fpn_v2.pt")
 
     x=torch.rand(1,3,64,64) #image.tensors #[2, 3, 800, 1312] list of tensors x= torch.rand(1,3,64,64)
     output = model.backbone(x) 
@@ -140,7 +105,7 @@ def test_defaultmodels():
     output = model(images, targets)
 
     #export the model to ONNX:
-    torch.onnx.export(model, x, "/data/cmpe249-fa23/trainoutput/faster_rcnn.onnx", opset_version = 11)
+    torch.onnx.export(model, x, "/data/cmpr258-sp4/trainoutput/faster_rcnn.onnx", opset_version = 11)
 
     #returns the post-processed predictions as a List[Dict[Tensor]], one for each input image
     # The fields of the Dict are as
@@ -174,7 +139,7 @@ def load_checkpoint(model, ckpt_file, fp16=False):
     model.half() if fp16 else model.float()
     return model
 
-def create_detectionmodel(modelname, num_classes=None, trainable_layers=0, ckpt_file = None, fp16=False, device= 'cuda:0', scale='n'):
+def create_detectionmodel(modelname, num_classes=None, trainable_layers=0, ckpt_file = None, fp16=False, device= 'cpu', scale='n'):
     model = None
     preprocess = None
     classes = None
@@ -219,8 +184,8 @@ def create_detectionmodel(modelname, num_classes=None, trainable_layers=0, ckpt_
 if __name__ == "__main__":
     test_defaultmodels()
 
-    os.environ['TORCH_HOME'] = '/data/cmpe249-fa23/torchhome/'
-    DATAPATH='/data/cmpe249-fa23/torchvisiondata/'
+    os.environ['TORCH_HOME'] = '/data/cmpr258-sp4/torchhome/'
+    DATAPATH='/data/cmpr258-sp4/torchvisiondata/'
 
 
     

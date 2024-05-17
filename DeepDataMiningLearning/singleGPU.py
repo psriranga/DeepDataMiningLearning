@@ -17,8 +17,8 @@ import numpy as np
 MACHINENAME='HPC'
 USE_AMP=True #AUTOMATIC MIXED PRECISION
 if MACHINENAME=='HPC':
-    os.environ['TORCH_HOME'] = '/data/cmpe249-fa23/torchhome/'
-    DATAPATH='/data/cmpe249-fa23/torchvisiondata'
+    os.environ['TORCH_HOME'] = '/data/cmpr258-sp4/torchhome/'
+    DATAPATH='/data/cmpr258-sp4/torchvisiondata'
 elif MACHINENAME=='Container':
     os.environ['TORCH_HOME'] = '/data/torchhome/'
     DATAPATH='/data/torchvisiondata'

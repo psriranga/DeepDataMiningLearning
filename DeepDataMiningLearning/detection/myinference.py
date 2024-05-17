@@ -255,8 +255,8 @@ def test_Customrcnn():
         row_settings=["var_names"]
     ) 
     device='cuda:3'
-    ckpt_file = "/data/cmpe249-fa23/modelzoo/fasterrcnn_resnet50_fpn_v2.pt"
-    #ckpt_file = "/data/cmpe249-fa23/trainoutput/waymococo/0923/model_40.pth" #resnet152
+    ckpt_file = "/data/cmpr258-sp4/modelzoo/fasterrcnn_resnet50_fpn_v2.pt"
+    #ckpt_file = "/data/cmpr258-sp4/trainoutput/waymococo/0923/model_40.pth" #resnet152
     model = load_checkpoint(myrcnn, ckpt_file, fp16=False)
     model=model.to(device)
 
@@ -311,7 +311,7 @@ def main(args):
 
     modelname = 'yolov8'
     imgpath = './sampledata/bus.jpg'
-    ckpt_file = '/data/cmpe249-fa23/modelzoo/yolov8n_statedicts.pt'
+    ckpt_file = '/data/cmpr258-sp4/modelzoo/yolov8n_statedicts.pt'
     device = 'cuda:0'
     multimodel_inference(modelname, imgpath, ckpt_file, device, scale='n')
 

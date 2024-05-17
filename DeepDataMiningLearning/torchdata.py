@@ -4,7 +4,7 @@ import torch
 import torchvision
 import torchvision.datasets as datasets
 import os
-mytorchvisiondata='data/'#'/data/cmpe249-fa23/torchvisiondata/'
+mytorchvisiondata='data/'#'/data/cmpr258-sp4/torchvisiondata/'
 
 print(torch.__version__)
 
@@ -68,7 +68,7 @@ test_data = datasets.FashionMNIST(
 # print(places365)
 
 #Download model
-os.environ['TORCH_HOME'] = '/data/cmpe249-fa23/torchhome/' #setting the environment variable
+os.environ['TORCH_HOME'] = '/data/cmpr258-sp4/torchhome/' #setting the environment variable
 resnet18 = torchvision.models.resnet18(pretrained=True)
 print(resnet18)
 resnet50 = torchvision.models.resnet50(weights=torchvision.models.ResNet50_Weights.DEFAULT)#torchvision.models.resnet50(pretrained=True)

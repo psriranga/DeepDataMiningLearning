@@ -219,8 +219,8 @@ def get_waymococodataset(is_train, is_val, args):
 import yaml
 from DeepDataMiningLearning.detection.dataset_yolo import YOLODataset
 def get_yolodataset(is_train, is_val, args):
-    rootPath=args.data_path #'/data/cmpe249-fa23/coco/'
-    #annotation=args.annotationfile #'/data/cmpe249-fa23/coco/train2017.txt'
+    rootPath=args.data_path #'/data/cmpr258-sp4/coco/'
+    #annotation=args.annotationfile #'/data/cmpr258-sp4/coco/train2017.txt'
     dataset_cfgfile = './DeepDataMiningLearning/detection/dataset.yaml'
     with open(dataset_cfgfile, errors='ignore', encoding='utf-8') as f:
         s = f.read()  # string
@@ -246,8 +246,8 @@ def get_yolodataset(is_train, is_val, args):
 
 from DeepDataMiningLearning.detection import utils
 class args:
-    data_path = '/data/cmpe249-fa23/coco/' #'/data/cmpe249-fa23/WaymoCOCO/' #'/data/cmpe249-fa23/coco/'
-    annotationfile = '/data/cmpe249-fa23/coco/train2017.txt'
+    data_path = '/data/cmpr258-sp4/coco/' #'/data/cmpr258-sp4/WaymoCOCO/' #'/data/cmpr258-sp4/coco/'
+    annotationfile = '/data/cmpr258-sp4/coco/train2017.txt'
     weights = None
     test_only = True
     backend = 'PIL' #tensor

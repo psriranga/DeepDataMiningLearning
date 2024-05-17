@@ -61,9 +61,9 @@ class YoloDetectionModel(nn.Module):
         if nc and nc != self.yaml['nc']:
             LOGGER.info(f"Overriding model.yaml nc={self.yaml['nc']} with nc={nc}")
             self.yaml['nc'] = nc  # override YAML value
-        self.model, self.save = parse_model(deepcopy(self.yaml), ch=ch, verbose=verbose)  # model, savelist
-        self.names = {i: f'{i}' for i in range(self.yaml['nc'])}  # default names dict, 0~79
-        self.inplace = self.yaml.get('inplace', True) #True
+
+        # get FasterRCNN model and preprocess function
+        self.model, self.preprocess = get_torchvision_detection_models('fasterrcnn_resnet50_fpn', box_score_thresh=0.9)
 
         #self.model.eval()
 
@@ -113,90 +113,38 @@ class YoloDetectionModel(nn.Module):
             preds, xtensors = self._predict_once(x) #tensor input #[1, 3, 256, 256]
             #y,x output in inference mode, training mode, direct output x (three items),
             return preds
-    #from base
-    # def forward(self, images, targets=None):
-    #     """
-    #     Forward pass of the model on a single scale.
-    #     Wrapper for `_forward_once` method.
 
-    #     Args:
-    #         x (torch.Tensor | dict): The input image tensor or a dict including image tensor and gt labels.
+    def forward(self, images, targets=None):
+        if self.training:
+            # Training mode
+            images, targets = self.preprocess(images, targets)
+            loss_dict = self.model(images, targets)
+            return sum(loss for loss in loss_dict.values())
+        else:
+            # Inference mode
+            images, _ = self.preprocess(images)
+            outputs = self.model(images)
+            return outputs
 
-    #     Returns:
-    #         (torch.Tensor): The output of the network.
-    #     """
-    #     if self.training and targets:
-    #         for target in targets:
-    #             boxes = target["boxes"] #boxes only used for format validation
-    #             if isinstance(boxes, torch.Tensor):
-    #                 torch._assert(
-    #                     len(boxes.shape) == 2 and boxes.shape[-1] == 4,
-    #                     f"Expected target boxes to be a tensor of shape [N, 4], got {boxes.shape}.",
-    #                 )
-    #             else:
-    #                 torch._assert(False, f"Expected target boxes to be of type Tensor, got {type(boxes)}.")
-    #         preds = self._predict_once(images) #tensor input
-    #         #in training mode, direct output x (three items)
-    #         if not hasattr(self, 'criterion'):
-    #             self.criterion = self.init_criterion()
-    #         batch={}
-    #         batch['batch_idx'] = target['image_id'] #int
-    #         batch['cls'] =target['labels'] #tensor int
-    #         batch['bboxes'] = target["boxes"]
-    #         losssum, losses=self.criterion(preds, batch) #losses is three item loss box, cls, dfl
-    #         return losssum
-    #     elif self.training:
-    #         preds = self._predict_once(images) #tensor input
-    #         return preds #training mode, direct output x (three items)
-    #     else: #inference mode
-    #         preds, xtensors = self._predict_once(images) #tensor input #[1, 3, 256, 256]
-    #         #y,x output in inference mode, training mode, direct output x (three items),
-    #         return preds
+    def postprocess(self, outputs, original_image_sizes):
+        results = []
+        for output, image_size in zip(outputs, original_image_sizes):
+            boxes = output['boxes'].cpu().numpy()
+            scores = output['scores'].cpu().numpy()
+            labels = output['labels'].cpu().numpy()
 
-        # if isinstance(x, dict):  # for cases of training and validating while training.
-        #     return self.loss(x, *args, **kwargs)
-        # return self.predict(x, *args, **kwargs)
-        
-        # if isinstance(images, dict):
-        #     need_loss = True
-        #     if not hasattr(self, 'criterion'):
-        #         self.criterion = self.init_criterion()
-        #     batch={}
-        #     batch['batch_idx']
-        #     batch['cls']
-        #     batch['bboxes']
-        #     losssum, losses=self.criterion(preds, batch) #losses is three item loss box, cls, dfl
-        #     return losssum
-        # elif torch.is_tensor(images): #[1, 3, 256, 256]
-        #     preds = self._predict_once(images) #tensor input
-        #     #y,x output, training mode, direct output x (three items)
-        #     return preds
-        # else:
-        #     print("input format not supported")
-        #     return None
-        # elif isinstance(images, list): #inference mode
-        #     imagelist = True
-        #     original_image_sizes: List[Tuple[int, int]] = []
-        #     for img in images:
-        #         val = img.shape[-2:]
-        #         torch._assert(
-        #             len(val) == 2,
-        #             f"expecting the last two dimensions of the Tensor to be H and W instead got {img.shape[-2:]}",
-        #         )
-        #         original_image_sizes.append((val[0], val[1]))
-        #     images=[self.letterbox(image=x) for x in images] #list of (640, 480, 3)
-        #     if self.detcttransform:
-        #         #imageslist, targets = self.detcttransform(images, targets)
-        #         #images = imageslist.tensors
-        #         images=[self.detcttransform(image=x) for x in images] #letterbox
-        #     images = self.pre_processing(images)
-        #     preds = self._predict_once(images) #tensor input
-        #     #y,x output, training mode, direct output loss x (three items)
-        #     if isinstance(preds, tuple):
-        #         #preds = [self.from_numpy(x) for x in y]
-        #         preds, losstensor = preds
-        #         detections = self.postprocess(preds, images, original_image_sizes)
-        #     return detections, losstensor
+            # Scale boxes to original image size
+            boxes = boxes * [image_size[1], image_size[0], image_size[1], image_size[0]]
+
+            for box, score, label in zip(boxes, scores, labels):
+                result = {
+                    'box': box.tolist(),
+                    'score': score,
+                    'label': self.config.id2label[label]
+                }
+                results.append(result)
+
+        return results
 
     
     def _predict_once(self, x, profile=False, visualize=False):
@@ -225,86 +173,6 @@ class YoloDetectionModel(nn.Module):
             # if visualize:
             #     feature_visualization(x, m.type, m.i, save_dir=visualize)
         return x
-        
-    # def _predict_augment(self, x):
-    #     """Perform augmentations on input image x and return augmented inference and train outputs."""
-    #     img_size = x.shape[-2:]  # height, width
-    #     s = [1, 0.83, 0.67]  # scales
-    #     f = [None, 3, None]  # flips (2-ud, 3-lr)
-    #     y = []  # outputs
-    #     for si, fi in zip(s, f):
-    #         xi = scale_img(x.flip(fi) if fi else x, si, gs=int(self.stride.max()))
-    #         yi = super().predict(xi)[0]  # forward
-    #         yi = self._descale_pred(yi, fi, si, img_size)
-    #         y.append(yi)
-    #     y = self._clip_augmented(y)  # clip augmented tails
-    #     return torch.cat(y, -1), None  # augmented inference, train
-
-    # @staticmethod
-    # def _descale_pred(p, flips, scale, img_size, dim=1):
-    #     """De-scale predictions following augmented inference (inverse operation)."""
-    #     p[:, :4] /= scale  # de-scale
-    #     x, y, wh, cls = p.split((1, 1, 2, p.shape[dim] - 4), dim)
-    #     if flips == 2:
-    #         y = img_size[0] - y  # de-flip ud
-    #     elif flips == 3:
-    #         x = img_size[1] - x  # de-flip lr
-    #     return torch.cat((x, y, wh, cls), dim)
-
-    # def _clip_augmented(self, y):
-    #     """Clip YOLOv5 augmented inference tails."""
-    #     nl = self.model[-1].nl  # number of detection layers (P3-P5)
-    #     g = sum(4 ** x for x in range(nl))  # grid points
-    #     e = 1  # exclude layer count
-    #     i = (y[0].shape[-1] // g) * sum(4 ** x for x in range(e))  # indices
-    #     y[0] = y[0][..., :-i]  # large
-    #     i = (y[-1].shape[-1] // g) * sum(4 ** (nl - 1 - x) for x in range(e))  # indices
-    #     y[-1] = y[-1][..., i:]  # small
-    #     return y
-
-    def init_criterion(self):
-        if "v8" in self.modelname:
-            return myv8DetectionLoss(self) #v8DetectionLoss(self)
-        elif "v7" in self.modelname:
-            return myv7DetectionLoss(self)
-    
-    def loss(self, batch, preds=None):
-        """
-        Compute loss
-
-        Args:
-            batch (dict): Batch to compute loss on
-            preds (torch.Tensor | List[torch.Tensor]): Predictions.
-        """
-        if not hasattr(self, 'criterion'):
-            self.criterion = self.init_criterion()
-
-        preds = self.forward(batch['img']) if preds is None else preds
-        return self.criterion(preds, batch) #return losssum, lossitems
-
-def initialize_weights(model):
-    """Initialize model weights to random values."""
-    for m in model.modules():
-        t = type(m)
-        if t is nn.Conv2d:
-            pass  # nn.init.kaiming_normal_(m.weight, mode='fan_out', nonlinearity='relu')
-        elif t is nn.BatchNorm2d:
-            m.eps = 1e-3
-            m.momentum = 0.03
-        elif t in [nn.Hardswish, nn.LeakyReLU, nn.ReLU, nn.ReLU6, nn.SiLU]:
-            m.inplace = True
-#yolov7 list
-# twoargs_blocks=[nn.Conv2d, Conv, RobustConv, RobustConv2, DWConv, GhostConv, RepConv, RepConv_OREPA, DownC, 
-#                  SPP, SPPF, SPPCSPC, GhostSPPCSPC, MixConv2d, Focus, Stem, GhostStem, CrossConv, 
-#                  Bottleneck, BottleneckCSPA, BottleneckCSPB, BottleneckCSPC, 
-#                  RepBottleneck, RepBottleneckCSPA, RepBottleneckCSPB, RepBottleneckCSPC,  
-#                  Res, ResCSPA, ResCSPB, ResCSPC, 
-#                  RepRes, RepResCSPA, RepResCSPB, RepResCSPC, 
-#                  ResX, ResXCSPA, ResXCSPB, ResXCSPC, 
-#                  RepResX, RepResXCSPA, RepResXCSPB, RepResXCSPC, 
-#                  Ghost, GhostCSPA, GhostCSPB, GhostCSPC,
-#                  SwinTransformerBlock, STCSPA, STCSPB, STCSPC,
-#                  SwinTransformer2Block, ST2CSPA, ST2CSPB, ST2CSPC,BottleneckCSP2, C3, C3TR, C3SPP, C3Ghost]
 
 twoargs_blocks=[nn.Conv2d, Classify, Conv, ConvTranspose, GhostConv, RepConv, Bottleneck, GhostBottleneck, SPP, SPPF, SPPCSPC, DWConv, Focus,
                  BottleneckCSP, C1, C2, C2f, C3, C3TR, C3Ghost, nn.ConvTranspose2d, DWConvTranspose2d, C3x, RepC3]
@@ -605,15 +473,3 @@ if __name__ == "__main__":
     im = to_pil_image(box.detach())
     # save a image using extension
     im = im.save("results.jpg")
-    
-
-    #img = torch.rand(1, 3, 640, 640)
-    # myyolov8.eval()
-    # y,x = myyolov8(images)
-    # #tuple output, second item is list of three, [1, 144, 80, 80], [1, 144, 40, 40], [1, 144, 20, 20]
-    # print(y.shape) #[1, 84, 8400]
-    # print(len(x)) #3
-    # print(x[0].shape) #[1, 144, 80, 80], [1, 144, 40, 40], [1, 144, 20, 20]
-
-
-

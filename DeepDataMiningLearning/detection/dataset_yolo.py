@@ -215,7 +215,7 @@ class YOLODataset(torch.utils.data.Dataset):
     """
     def __init__(self, root, annotation, train=True, transform=None, data=None, imgsz=640, format='yolo', use_segments=False, use_keypoints=False, **kwargs):
         #super().__init__()
-        self.root = root #/data/cmpe249-fa23/coco/
+        self.root = root #/data/cmpr258-sp4/coco/
         if train:
             foldername='train2017'
         else:
@@ -296,7 +296,7 @@ class YOLODataset(torch.utils.data.Dataset):
         """
         """Returns dictionary of labels for YOLO training."""
         self.label_files = img2label_paths(self.im_files) #replace image path to labels path, point to txt label file
-        #cache_path = Path(self.label_files[0]).parent.with_suffix('.cache') #'/data/cmpe249-fa23/coco/labels/train2017.cache'
+        #cache_path = Path(self.label_files[0]).parent.with_suffix('.cache') #'/data/cmpr258-sp4/coco/labels/train2017.cache'
         try:
             cache, exists = load_dataset_cache_file(cache_path), True  # attempt to load a *.cache file
             #assert cache['version'] == DATASET_CACHE_VERSION  # matches current version
@@ -460,7 +460,6 @@ class YOLODataset(torch.utils.data.Dataset):
                 target_areas.append(area)
         nl=len(target_bbox)
         target = {}
-        #self.format = 'coco'
         if self.format=='yolo':
             target['img']=img #CHW
             target['bboxes'] = torch.as_tensor(target_bbox, dtype=torch.float32) if nl else torch.zeros((nl, 4))
@@ -473,13 +472,11 @@ class YOLODataset(torch.utils.data.Dataset):
             return target #dict
         else:
             target['boxes'] = torch.as_tensor(target_bbox, dtype=torch.float32) if nl else torch.zeros((nl, 4))
-            # Labels int value for class
             target['labels'] = torch.as_tensor(np.array(target_labels), dtype=torch.int64) if nl else torch.zeros(nl)
             target['image_id'] = int(index)
             target["area"] = torch.as_tensor(np.array(target_areas), dtype=torch.float32) if nl else torch.zeros(nl)
             target["iscrowd"] = torch.as_tensor(np.array(target_crowds), dtype=torch.int64) if nl else torch.zeros(nl)
-            target['batch_idx'] = torch.zeros(nl) #new added in yolo
-            target['orig_shape'] = originalimgshape # torch.as_tensor(originalimgshape, dtype=torch.int64)
+
             return img, target
     
     #ultralytics\data\base.py
@@ -544,8 +541,8 @@ class YOLODataset(torch.utils.data.Dataset):
 
 import yaml
 if __name__ == "__main__":
-    root='/data/cmpe249-fa23/coco/'
-    annotation='/data/cmpe249-fa23/coco/train2017.txt'
+    root='/data/cmpr258-sp4/coco/'
+    annotation='/data/cmpr258-sp4/coco/train2017.txt'
     dataset_cfgfile = './DeepDataMiningLearning/detection/dataset.yaml'
     with open(dataset_cfgfile, errors='ignore', encoding='utf-8') as f:
         s = f.read()  # string

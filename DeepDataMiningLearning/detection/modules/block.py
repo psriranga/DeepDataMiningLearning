@@ -1736,7 +1736,7 @@ class OREPA_3x3_RepConv(nn.Module):
         self.branch_counter += 1
 
         if internal_channels_1x1_3x3 is None:
-            internal_channels_1x1_3x3 = in_channels if groups < out_channels else 2 * in_channels   # For mobilenet, it is better to have 2X internal channels
+            internal_channels_1x1_3x3 = in_channels if groups < out_channels else 2 * in_channels   # For efficient, it is better to have 2X internal channels
 
         if internal_channels_1x1_3x3 == in_channels:
             self.weight_rbr_1x1_kxk_idconv1 = nn.Parameter(torch.zeros(in_channels, int(in_channels/self.groups), 1, 1))

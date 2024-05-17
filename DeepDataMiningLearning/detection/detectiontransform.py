@@ -7,12 +7,11 @@ import torchvision
 from torch import nn, Tensor
 from typing import Any, Dict, List, Optional, Tuple
 from torch import Tensor
-#from torchvision.io.image import read_image
 from PIL import Image
 import DeepDataMiningLearning.detection.transforms as T
 
 def max_by_axis(the_list: List[List[int]]) -> List[int]:
-    maxes = the_list[0]#[[3, 800, 1295]] -> [3, 800, 1295]
+    maxes = the_list[0]
     for sublist in the_list[1:]:
         for index, item in enumerate(sublist):
             maxes[index] = max(maxes[index], item)
@@ -24,12 +23,6 @@ def _resize_image_and_masks(
     self_max_size: int,
     target: Optional[Dict[str, Tensor]] = None,
 ) -> Tuple[Tensor, Optional[Dict[str, Tensor]]]:
-    # if torchvision._is_tracing():
-    #     im_shape = _get_shape_onnx(image)
-    # elif torch.jit.is_scripting():
-    #     im_shape = torch.tensor(image.shape[-2:])
-    # else:
-    #     im_shape = image.shape[-2:]
     im_shape = image.shape[-2:]
 
     size: Optional[List[int]] = None
@@ -125,10 +118,6 @@ class DetectionTransform(nn.Module):
     ) -> Tuple[ImageList, Optional[List[Dict[str, Tensor]]]]:
         images = [img for img in images]
         if targets is not None:
-            # make a copy of targets to avoid modifying it in-place
-            # once torchscript supports dict comprehension
-            # this can be simplified as follows
-            # targets = [{k: v for k,v in t.items()} for t in targets]
             targets_copy: List[Dict[str, Tensor]] = []
             for t in targets:
                 data: Dict[str, Tensor] = {}
@@ -179,9 +168,7 @@ class DetectionTransform(nn.Module):
     ) -> Tuple[Tensor, Optional[Dict[str, Tensor]]]:
         h, w = image.shape[-2:]
         if self.training:
-            # if self._skip_resize:
-            #     return image, target
-            size = self.min_size[-1] #self.torch_choice(self.min_size)
+            size = self.min_size[-1]
         else:
             size = self.min_size[-1]
         image, target = _resize_image_and_masks(image, size, self.max_size, target)
@@ -196,11 +183,6 @@ class DetectionTransform(nn.Module):
         return image, target
     
     def batch_images(self, images: List[Tensor], size_divisible: int = 32) -> Tensor:
-        # if torchvision._is_tracing():
-        #     # batch_images() does not export well to ONNX
-        #     # call _onnx_batch_images() instead
-        #     return self._onnx_batch_images(images, size_divisible)
-
         max_size = max_by_axis([list(img.shape) for img in images])
         stride = float(size_divisible)
         max_size = list(max_size)
@@ -227,14 +209,6 @@ class DetectionTransform(nn.Module):
             boxes = pred["boxes"]
             boxes = resize_boxes(boxes, im_s, o_im_s)
             result[i]["boxes"] = boxes
-            # if "masks" in pred:
-            #     masks = pred["masks"]
-            #     masks = paste_masks_in_image(masks, boxes, o_im_s)
-            #     result[i]["masks"] = masks
-            # if "keypoints" in pred:
-            #     keypoints = pred["keypoints"]
-            #     keypoints = resize_keypoints(keypoints, im_s, o_im_s)
-            #     result[i]["keypoints"] = keypoints
         return result
 
 
@@ -242,31 +216,31 @@ def get_transformsimple(train):
     transforms = []
     transforms.append(T.PILToTensor())
     transforms.append(T.ToDtype(torch.float, scale=True))
-    # if train:
-    #     transforms.append(RandomHorizontalFlip(0.5))
+    return T.Compose(transforms)
+
+
+def get_transforms(train):
+    transforms = []
+    transforms.append(T.PILToTensor())
+    transforms.append(T.ConvertImageDtype(torch.float))
+    if train:
+        transforms.append(T.RandomHorizontalFlip(0.5))
     return T.Compose(transforms)
 
 def test_imagetransform(images, target, image_mean=[0.485, 0.456, 0.406], image_std=[0.229, 0.224, 0.225]):
-
-    #https://github.com/pytorch/vision/blob/main/torchvision/models/detection/transform.py
-    #GeneralizedRCNNTransform: List[Tensor] ->
-    #image Tensor list input
     for i in range(len(images)):
         image = images[i]
-        #normalize the image
         mean = torch.as_tensor(image_mean, dtype=image.dtype)
         std = torch.as_tensor(image_std, dtype=image.dtype)
-        #mean[:, None, None]: torch.Size([3]) => torch.Size([3, 1, 1])
-        image=(image - mean[:, None, None]) / std[:, None, None] #torch.Size([3, 1142, 1850])
+        image=(image - mean[:, None, None]) / std[:, None, None]
 
-        #resize the image
-        im_shape = image.shape[-2:]#torch.Size([1142, 1850])
-        min_size = min(im_shape)#1142
-        max_size = max(im_shape)#1850
+        im_shape = image.shape[-2:]
+        min_size = min(im_shape)
+        max_size = max(im_shape)
         set_min_size=800
         set_max_size=1333
-        scale_factor = min(set_min_size / min_size, set_max_size / max_size) #0.7 follow min_size
-        image_input=image[None] #torch.Size([1, 3, 1142, 1850])
+        scale_factor = min(set_min_size / min_size, set_max_size / max_size)
+        image_input=image[None]
         image = torch.nn.functional.interpolate(
             image_input,
             size=None,
@@ -275,52 +249,44 @@ def test_imagetransform(images, target, image_mean=[0.485, 0.456, 0.406], image_
             recompute_scale_factor=True,
             align_corners=False,
         )[0]
-        print(image.shape) #torch.Size([3, 800, 1295]) #H size=min_size, W size<max_size
+        print(image.shape)
         images[i] = image
 
-    image_sizes = [img.shape[-2:] for img in images] #[torch.Size([800, 1295])]
-    #batch_images(self, images: List[Tensor], size_divisible: int = 32) -> Tensor
-    max_size = max_by_axis([list(img.shape) for img in images]) #[3, 800, 1295]
+    image_sizes = [img.shape[-2:] for img in images]
+    max_size = max_by_axis([list(img.shape) for img in images])
     size_divisible=32
     stride = float(size_divisible)
     max_size = list(max_size)
     max_size[1] = int(math.ceil(float(max_size[1]) / stride) * stride)
-    max_size[2] = int(math.ceil(float(max_size[2]) / stride) * stride) #[3, 800, 1312]
+    max_size[2] = int(math.ceil(float(max_size[2]) / stride) * stride)
 
-    batch_shape = [len(images)] + max_size #[2, 3, 800, 1312]
-    batched_imgs = images[0].new_full(batch_shape, 0) #[2, 3, 800, 1312]
+    batch_shape = [len(images)] + max_size
+    batched_imgs = images[0].new_full(batch_shape, 0)
     for i in range(batched_imgs.shape[0]):
-        img = images[i] #[3, 800, 1295]
-        batched_imgs[i, : img.shape[0], : img.shape[1], : img.shape[2]].copy_(img) #copy the elements from img to self
-    #return batched_imgs [2, 3, 800, 1312]
+        img = images[i]
+        batched_imgs[i, : img.shape[0], : img.shape[1], : img.shape[2]].copy_(img)
     image_sizes_list: List[Tuple[int, int]] = []
-    for image_size in image_sizes:#original image size
+    for image_size in image_sizes:
         torch._assert(
             len(image_size) == 2,
             f"Input tensors expected to have in the last two elements H and W, instead got {image_size}",
         )
         image_sizes_list.append((image_size[0], image_size[1]))
 
-    image_list = ImageList(batched_imgs, image_sizes_list)#images: list of [3, 800, 1295], image_sizes_list: [(800, 1295)]
+    image_list = ImageList(batched_imgs, image_sizes_list)
 
     return image_list, target
 
 
 if __name__ == "__main__":
-    #imgpath = "../../sampledata/sjsupeople.jpg"
-    imgpath = "/home/010796032/MyRepo/DeepDataMiningLearning/sampledata/sjsupeople.jpg"#"../../sampledata/sjsupeople.jpg"
-    image = Image.open(imgpath) #PIL image
+    imgpath = "/home/017103164/MyRepo/DeepDataMiningLearning/sampledata/sjsupeople.jpg"
+    image = Image.open(imgpath)
 
-    image_transfunc=get_transformsimple(train=True)
-    image, target = image_transfunc(image, target=None) #image tensor [3, 1142, 1850]
-    #image = torch.rand(3, 300, 400) #tensor CHW
-    print(image.is_floating_point()) #Expected input images to be of floating type (in range [0, 1])
-    print(image.dtype) #torch.float32
+    image_transfunc=get_transforms(train=True)
+    image, target = image_transfunc(image, target=None)
+    print(image.is_floating_point())
+    print(image.dtype)
     
-    images = [image]#[img for img in images]
-    #add another random image
+    images = [image]
     images.append(torch.rand(3, 400, 600))
-    #image list input
-    image, target = test_imagetransform(image, target) #torch.Size([3, 800, 1295])
-    #x=image.tensors
-    #imagelist object, tensors section is list of tensors
+    image, target = test_imagetransform(image, target)

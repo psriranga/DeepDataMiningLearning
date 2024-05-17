@@ -11,9 +11,9 @@ import torchvision.models.detection
 from DeepDataMiningLearning.detection import utils
 from DeepDataMiningLearning.detection.trainutils import create_aspect_ratio_groups, GroupedBatchSampler
 
-from DeepDataMiningLearning.detection.dataset import get_dataset #get_cocodataset, get_kittidataset, get_transform
-from DeepDataMiningLearning.detection.models import create_detectionmodel #get_torchvision_detection_models, modify_fasterrcnnheader
-from DeepDataMiningLearning.detection.myevaluator import simplemodelevaluate, modelevaluate, yoloevaluate
+from DeepDataMiningLearning.detection.dataset import get_dataset
+from DeepDataMiningLearning.detection.models import create_detectionmodel
+from DeepDataMiningLearning.detection.myevaluator import simplemodelevaluate, modelevaluate
 
 try:
     from torchinfo import summary
@@ -27,24 +27,24 @@ except:
 MACHINENAME='HPC'
 USE_AMP=True #AUTOMATIC MIXED PRECISION
 # if MACHINENAME=='HPC':
-#     os.environ['TORCH_HOME'] = '/data/cmpe249-fa23/torchhome/'
-#     DATAPATH='/data/cmpe249-fa23/torchvisiondata/'
+#     os.environ['TORCH_HOME'] = '/data/cmpr258-sp4/torchhome/'
+#     DATAPATH='/data/cmpr258-sp4/torchvisiondata/'
 # elif MACHINENAME=='Container':
 #     os.environ['TORCH_HOME'] = '/data/torchhome/'
 #     DATAPATH='/data/torchvisiondata'
 # else:
 #     DATAPATH='./data'
 
-#dataset: #coco, /data/cmpe249-fa23/COCOoriginal/
-#kitti /data/cmpe249-fa23/torchvisiondata/Kitti/
+#dataset: #coco, /data/cmpr258-sp4/COCOoriginal/
+#kitti /data/cmpr258-sp4/torchvisiondata/Kitti/
 
-#(mycondapy310) [010796032@cs003 detection]$ torchrun --nproc_per_node=4 mytrain.py --batch-size=32
+#(mycondapy310) [017103164@cs003 detection]$ torchrun --nproc_per_node=4 mytrain.py --batch-size=32
 def get_args_parser(add_help=True):
     import argparse
 
     parser = argparse.ArgumentParser(description="PyTorch Detection Training", add_help=add_help)
 
-    parser.add_argument("--data-path", default="/data/cmpe249-fa23/waymotrain200cocoyolo/", type=str, help="dataset path") #/data/cmpe249-fa23/waymotrain200cocoyolo/, /data/cmpe249-fa23/coco/
+    parser.add_argument("--data-path", default="/data/cmpr258-sp4/waymotrain200cocoyolo/", type=str, help="dataset path") #/data/cmpr258-sp4/waymotrain200cocoyolo/, /data/cmpr258-sp4/coco/
     parser.add_argument("--annotationfile", default="", type=str, help="dataset annotion file path, e.g., coco json file")
     parser.add_argument(
         "--dataset",
@@ -54,7 +54,7 @@ def get_args_parser(add_help=True):
     )
     parser.add_argument("--model", default="yolov8", type=str, help="model name") #customrcnn_resnet152, fasterrcnn_resnet50_fpn_v2
     parser.add_argument("--scale", default="x", type=str, help="model scale: n, x") 
-    parser.add_argument("--ckpt", default="/data/cmpe249-fa23/modelzoo/yolov8x_statedicts.pt", type=str, help="model name") #"/data/cmpe249-fa23/modelzoo/yolov8n_statedicts.pt"
+    parser.add_argument("--ckpt", default="/data/cmpr258-sp4/modelzoo/yolov8x_statedicts.pt", type=str, help="model name") #"/data/cmpr258-sp4/modelzoo/yolov8n_statedicts.pt"
     parser.add_argument("--trainable", default=0, type=int, help="number of trainable layers (sequence) of backbone")
     parser.add_argument("--device", default="cuda:3", type=str, help="device (Use cuda or cpu Default: cuda)")
     parser.add_argument(
@@ -105,8 +105,8 @@ def get_args_parser(add_help=True):
         "--lr-gamma", default=0.1, type=float, help="decrease lr by a factor of lr-gamma (multisteplr scheduler only)"
     )
     parser.add_argument("--print-freq", default=50, type=int, help="print frequency")
-    parser.add_argument("--output-dir", default="/data/cmpe249-fa23/trainoutput", type=str, help="path to save outputs")
-    parser.add_argument("--resume", default="/data/cmpe249-fa23/trainoutput/yolo/yolov8x0319/model_30.pth", type=str, help="path of checkpoint") #/data/cmpe249-fa23/trainoutput/yolo/yolov8x0318/model_25.pth
+    parser.add_argument("--output-dir", default="/data/cmpr258-sp4/trainoutput", type=str, help="path to save outputs")
+    parser.add_argument("--resume", default="/data/cmpr258-sp4/trainoutput/yolo/yolov8x0319/model_30.pth", type=str, help="path of checkpoint") #/data/cmpr258-sp4/trainoutput/yolo/yolov8x0318/model_25.pth
     parser.add_argument("--start_epoch", default=0, type=int, help="start epoch")
     parser.add_argument("--aspect-ratio-group-factor", default=-1, type=int) #3
     parser.add_argument("--rpn-score-thresh", default=None, type=float, help="rpn score threshold for faster-rcnn")
@@ -314,6 +314,7 @@ def main(args):
     total_time_str = str(datetime.timedelta(seconds=int(total_time)))
     print(f"Training time {total_time_str}")
 
+
 def train_one_epoch(model, optimizer, data_loader, device, preprocess, epoch, print_freq, scaler=None):
     model.train()
     metric_logger = utils.MetricLogger(delimiter="  ")
@@ -329,21 +330,14 @@ def train_one_epoch(model, optimizer, data_loader, device, preprocess, epoch, pr
             optimizer, start_factor=warmup_factor, total_iters=warmup_iters
         )
 
-    #images, targets
     for batch in metric_logger.log_every(data_loader, print_freq, header):
-        batch['img']=preprocess(batch['img']) #batch['img'] = batch['img'].to(device)
-        #img is already a tensor, preprocess function only do device
+        images, targets = batch['img'], batch['target']
+        images = list(image.to(device) for image in images)
+        targets = [{k: v.to(device) for k, v in t.items()} for t in targets]
 
-        #images = list(image.to(device) for image in images) #list of [3, 1280, 1920]
-        #targets = [{k: v.to(device) if isinstance(v, torch.Tensor) else v for k, v in t.items()} for t in targets] #tuple to list
         with torch.cuda.amp.autocast(enabled=scaler is not None):
-            #loss_dict = model(images, targets) #dict with 4 keys
-            loss, loss_items = model(batch)
-            losses = loss #sum(loss for loss in loss_dict.values()) #single value
-            loss_dict={}
-            loss_dict['box']=loss_items[0]
-            loss_dict['cls']=loss_items[1]
-            loss_dict['dfl']=loss_items[2]
+            loss_dict = model(images, targets)
+            losses = sum(loss for loss in loss_dict.values())
 
         # reduce losses over all GPUs for logging purposes
         loss_dict_reduced = utils.reduce_dict(loss_dict)

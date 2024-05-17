@@ -1,12 +1,13 @@
-from typing import Callable, Dict, List, Optional, Union
+from typing import Callable, Dict, Optional
 import torch
 from torch import nn, Tensor
 import torchvision
-from torchvision.ops import misc as misc_nn_ops
 from torchvision.ops.feature_pyramid_network import ExtraFPNBlock, FeaturePyramidNetwork, LastLevelMaxPool
 
-from torchvision.models import resnet #, resnet50, ResNet50_Weights
-from torchvision.models import get_model, get_model_weights, get_weight, list_models
+from torchvision.models import resnet
+from torchvision.models.detection import FasterRCNN
+from torchvision.models.detection.rpn import AnchorGenerator
+from torchvision.models import get_model, get_model_weights
 
 def get_backbone(model_name: str,
                  norm_layer: Optional[Callable[..., nn.Module]] = None,
@@ -137,8 +138,8 @@ def remove_classificationheader(model, num_removeblock):
 
 
 if __name__ == "__main__":
-    os.environ['TORCH_HOME'] = '/data/cmpe249-fa23/torchhome/'
-    DATAPATH='/data/cmpe249-fa23/torchvisiondata/'
+    os.environ['TORCH_HOME'] = '/data/cmpr258-sp4/torchhome/'
+    DATAPATH='/data/cmpr258-sp4/torchvisiondata/'
 
     #model_name = 'resnet50' #["layer4", "layer3", "layer2", "layer1", "conv1"]
     #model_name = 'resnet152' #["layer4", "layer3", "layer2", "layer1", "conv1"]
@@ -161,3 +162,28 @@ if __name__ == "__main__":
     output = model(x) 
     print([(k, v.shape) for k, v in output.items()])
     #[('0', torch.Size([1, 256, 16, 16])), ('1', torch.Size([1, 256, 8, 8])), ('2', torch.Size([1, 256, 4, 4])), ('3', torch.Size([1, 256, 2, 2])), ('pool', torch.Size([1, 256, 1, 1]))]
+
+# integrating EfficientNet backbone
+
+def get_efficientnet_fasterrcnn(num_classes):
+    backbone = torchvision.models.efficientnet_b0(pretrained=True).features
+    backbone.out_channels = 1280  # EfficientNet's output channels
+
+    # generating anchor boxes
+    anchor_generator = AnchorGenerator(
+        sizes=((32, 64, 128, 256, 512),),
+        aspect_ratios=((0.5, 1.0, 2.0),) * 5
+    )
+    
+    roi_pooler = torchvision.ops.MultiScaleRoIAlign(
+        featmap_names=['0'],
+        output_size=7,
+        sampling_ratio=2
+    )
+    model = FasterRCNN(
+        backbone,
+        num_classes=num_classes,
+        rpn_anchor_generator=anchor_generator,
+        box_roi_pool=roi_pooler
+    )
+    return model

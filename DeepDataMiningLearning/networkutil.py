@@ -28,7 +28,7 @@ def _get_redirect_url(url: str, max_hops: int = 3) -> str:
         )
 
 def download(url, dir='.', filename='tmp.zip', unzip=True, delete=False, curl=True):
-    #f = Path("/home/010796032/MyRepo/DeepDataMiningLearning/data") / "coco128_with_yaml.zip"  # filename
+    #f = Path("/home/017103164/MyRepo/DeepDataMiningLearning/data") / "coco128_with_yaml.zip"  # filename
     dir=Path(dir)
     dir.mkdir(parents=True, exist_ok=True)  # make directory
     f = dir / filename
@@ -51,7 +51,7 @@ def download(url, dir='.', filename='tmp.zip', unzip=True, delete=False, curl=Tr
             f.unlink()  # remove zip
 
 def downloadurls(dir, urls):
-    #dir = Path("/home/010796032/MyRepo/DeepDataMiningLearning/data") #root path
+    #dir = Path("/home/017103164/MyRepo/DeepDataMiningLearning/data") #root path
     dir = Path(dir)
     for u in [urls] if isinstance(urls, (str, Path)) else urls:
         filename = Path(u).name
